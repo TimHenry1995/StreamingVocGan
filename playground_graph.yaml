@@ -1,0 +1,25 @@
+graphs:
+  - id: MyFirstGraph
+    nodes:
+    - id: specgen
+      module: nodes
+      class: SpectrogramGenerator
+      params:
+        input_path: '/Users/timdick/Documents/Master_Internship/waveglow/mel_spectrograms/LJ001-0015.wav.pt'
+    - id: vocgan
+      module: nodes
+      class: Vocgan
+      params:
+        model_path: 'vctk_pretrained_model_3180.pt'
+    - id: display
+      module: timeflux.nodes.debug
+      class: Display
+    - id: audioPlayer
+      module: nodes
+      class: AudioPlayer
+    edges:
+    - source: specgen
+      target: vocgan
+    - source: vocgan
+      target: audioPlayer
+    rate: 10
