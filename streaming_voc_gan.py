@@ -152,9 +152,9 @@ class StreamingVocGan():
 
                 # Text box
                 textstr = ',   '.join((
-                    '   Efficiency = Processing time / Slice Duration',
-                    r'5 percent trimmed average Slice Duration = %.2f sec' % (stats.trim_mean(slice_durations, 0.05)),
-                    r'5 percent trimmed average Processing Time = %.2f sec' % (stats.trim_mean(slice_processing_times, 0.05))))
+                    '   Efficiency = Processing Time / Audio Duration',
+                    r'5 percent trimmed average Audio Duration = %.4f sec' % (stats.trim_mean(slice_durations, 0.05)),
+                    r'5 percent trimmed average Processing Time = %.4f sec' % (stats.trim_mean(slice_processing_times, 0.05))))
 
                 props = dict(boxstyle='round', facecolor='white', alpha=0.5)
 
@@ -222,7 +222,10 @@ class StreamingVocGan():
         
         Inputs:
         - spectrogram_time_frame_count: The total number of time frames in the spectrogram.
-        - target_seconds_per_slice: The desired number of seconds per slice. Note that due to rastorization the actual duration might differ slightly (see output).
+        - target_seconds_per_slice: The desired amount of new seconds per slice. Beware that a single time frame covers about 46ms of audio but due to overlap
+            the next time frame will only add about 12ms of new audio (see StreamingVocGan.TIMING_CONVENTIONS). Here, the parameter target_seconds_per_slice
+            assumes a slice for when the stream is running. Hence it disregardes overlap with the previous slide and only considers the new duration that this slice provides.
+            Note that due to rastorization the actual duration might differ slightly (see output).
         
         Outputs:
         - time_frame_count_per_slice: The number of spectrogram time frames that should be used per slice.
@@ -230,12 +233,11 @@ class StreamingVocGan():
         - slice_count: The number of slices that can be obtained with the time_frame_count. Note that all slices are assumed to have the here computed time frame count, expect for the last slice which may be shorter."""
 
         # Compute number of time frames
-        a =  StreamingVocGan.TIMING_CONVENTIONS["Seconds Per Spectrogram Window"] 
         b = StreamingVocGan.TIMING_CONVENTIONS["Seconds Per Spectrogram Hop"] 
-        time_frames_per_slice = (int)(np.round((target_seconds_per_slice - a)/b)) + 1
+        time_frames_per_slice = (int)(np.round((target_seconds_per_slice)/b)) 
         
         # Actual duration of slice
-        actual_seconds_per_slice = (time_frames_per_slice-1) * b + a
+        actual_seconds_per_slice = (time_frames_per_slice) * b 
 
         # Number of slices
         slice_count = math.ceil(spectrogram_time_frame_count/time_frames_per_slice)
@@ -321,9 +323,9 @@ if __name__ == "__main__":
     streaming_model = StreamingVocGan(is_streaming=True)
 
     # Setup a generator for the spectrogram slices
-    time_frames_per_slice, actual_seconds_per_slice, slice_count = StreamingVocGan.slice_duration_to_frame_count(spectrogram_time_frame_count=mel_spectrogram.shape[-1], target_seconds_per_slice=0.075)
-    print(time_frames_per_slice)
-    print(f"The duration of each spectrogram slice is {actual_seconds_per_slice} seconds.") # Note, the output slices will have duration of frames_per_slice * StreamingVocGan.TIMING_CONVENTIONS['Seconds Per Spectrogram Hop'] which is a bit shorter. The surplus is saved in the state of the vocgan during streaming
+    time_frames_per_slice, actual_seconds_per_slice, slice_count = StreamingVocGan.slice_duration_to_frame_count(spectrogram_time_frame_count=mel_spectrogram.shape[-1], target_seconds_per_slice=0.035)
+    print(f"Each spectrogram slice contains {time_frames_per_slice} frames.")
+    print(f"Each spectrogram slice provides {actual_seconds_per_slice} seconds of new audio.") # Note, the output slices will have duration of frames_per_slice * StreamingVocGan.TIMING_CONVENTIONS['Seconds Per Spectrogram Hop'] which is a bit shorter. The surplus is saved in the state of the vocgan during streaming
     generator = streaming_model.slice_generator(mel_spectrogram=mel_spectrogram, time_frames_per_slice=time_frames_per_slice)
     
     # Containers
